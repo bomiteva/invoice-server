@@ -1,3 +1,4 @@
+import os
 from enum import Enum
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from starlette.background import BackgroundTasks
@@ -29,7 +30,7 @@ TAGS_METADATA = [
 app = FastAPI(title="InvoiceApp", openapi_tags=TAGS_METADATA)
 
 
-@app.post("/invoice", tags=["Upload invoice"],response_class=JSONResponse)
+@app.post("/invoice", tags=["Upload invoice"], response_class=JSONResponse)
 async def post_invoice(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     """This endpoint sends the csv file to the server.
     Uploads the file and in the another process creates new files based on buyer.
@@ -49,10 +50,14 @@ async def post_invoice(background_tasks: BackgroundTasks, file: UploadFile = Fil
 @app.get("/invoice/{upload_id}/{buyer}", tags=["Get invoice"], response_class=FileResponse)
 def get_invoice(upload_id: int, buyer: str, target_type: TargetType = TargetType.csv):
     """This endpoint returns xml or csv file by specific upload id, buyer and target type."""
-    if target_type == TargetType.csv:
-        return FileResponse(f"{BASE_DIR}/invoices_{upload_id}/{buyer}.csv")
 
-    if target_type == TargetType.xml:
-        return FileResponse(f"{BASE_DIR}/invoices_{upload_id}/{buyer}.xml")
+    if target_type != TargetType.csv and target_type != TargetType.xml:
+        raise HTTPException(status_code=422, detail="Target type not found")
 
-    raise HTTPException(status_code=422, detail="Target type not found")
+    file = f"{BASE_DIR}/invoices_{upload_id}/{buyer}.{target_type}"
+    if os.path.isfile(file):
+        return FileResponse(file)
+    else:
+        raise HTTPException(status_code=404, detail="File not found. Upload id or buyer invalid.")
+
+
